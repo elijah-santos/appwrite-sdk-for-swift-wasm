@@ -1,6 +1,4 @@
-import AsyncHTTPClient
 import Foundation
-import NIO
 import JSONCodable
 import AppwriteEnums
 import AppwriteModels
@@ -26,14 +24,14 @@ open class Avatars: Service {
     ///   - height: Int (optional)
     ///   - quality: Int (optional)
     /// - Throws: Exception if the request fails
-    /// - Returns: ByteBuffer
+    /// - Returns: Data
     ///
     open func getBrowser(
         code: AppwriteEnums.Browser,
         width: Int? = nil,
         height: Int? = nil,
         quality: Int? = nil
-    ) async throws -> ByteBuffer {
+    ) async throws -> Data {
         let apiPath: String = "/avatars/browsers/{code}"
             .replacingOccurrences(of: "{code}", with: code.rawValue)
 
@@ -68,14 +66,14 @@ open class Avatars: Service {
     ///   - height: Int (optional)
     ///   - quality: Int (optional)
     /// - Throws: Exception if the request fails
-    /// - Returns: ByteBuffer
+    /// - Returns: Data
     ///
     open func getCreditCard(
         code: AppwriteEnums.CreditCard,
         width: Int? = nil,
         height: Int? = nil,
         quality: Int? = nil
-    ) async throws -> ByteBuffer {
+    ) async throws -> Data {
         let apiPath: String = "/avatars/credit-cards/{code}"
             .replacingOccurrences(of: "{code}", with: code.rawValue)
 
@@ -102,11 +100,11 @@ open class Avatars: Service {
     /// - Parameters:
     ///   - url: String
     /// - Throws: Exception if the request fails
-    /// - Returns: ByteBuffer
+    /// - Returns: Data
     ///
     open func getFavicon(
         url: String
-    ) async throws -> ByteBuffer {
+    ) async throws -> Data {
         let apiPath: String = "/avatars/favicon"
 
         let apiParams: [String: Any?] = [
@@ -139,14 +137,14 @@ open class Avatars: Service {
     ///   - height: Int (optional)
     ///   - quality: Int (optional)
     /// - Throws: Exception if the request fails
-    /// - Returns: ByteBuffer
+    /// - Returns: Data
     ///
     open func getFlag(
         code: AppwriteEnums.Flag,
         width: Int? = nil,
         height: Int? = nil,
         quality: Int? = nil
-    ) async throws -> ByteBuffer {
+    ) async throws -> Data {
         let apiPath: String = "/avatars/flags/{code}"
             .replacingOccurrences(of: "{code}", with: code.rawValue)
 
@@ -182,13 +180,13 @@ open class Avatars: Service {
     ///   - width: Int (optional)
     ///   - height: Int (optional)
     /// - Throws: Exception if the request fails
-    /// - Returns: ByteBuffer
+    /// - Returns: Data
     ///
     open func getImage(
         url: String,
         width: Int? = nil,
         height: Int? = nil
-    ) async throws -> ByteBuffer {
+    ) async throws -> Data {
         let apiPath: String = "/avatars/image"
 
         let apiParams: [String: Any?] = [
@@ -229,14 +227,14 @@ open class Avatars: Service {
     ///   - height: Int (optional)
     ///   - background: String (optional)
     /// - Throws: Exception if the request fails
-    /// - Returns: ByteBuffer
+    /// - Returns: Data
     ///
     open func getInitials(
         name: String? = nil,
         width: Int? = nil,
         height: Int? = nil,
         background: String? = nil
-    ) async throws -> ByteBuffer {
+    ) async throws -> Data {
         let apiPath: String = "/avatars/initials"
 
         let apiParams: [String: Any?] = [
@@ -265,14 +263,14 @@ open class Avatars: Service {
     ///   - margin: Int (optional)
     ///   - download: Bool (optional)
     /// - Throws: Exception if the request fails
-    /// - Returns: ByteBuffer
+    /// - Returns: Data
     ///
     open func getQR(
         text: String,
         size: Int? = nil,
         margin: Int? = nil,
         download: Bool? = nil
-    ) async throws -> ByteBuffer {
+    ) async throws -> Data {
         let apiPath: String = "/avatars/qr"
 
         let apiParams: [String: Any?] = [
@@ -324,7 +322,7 @@ open class Avatars: Service {
     ///   - quality: Int (optional)
     ///   - output: AppwriteEnums.Output (optional)
     /// - Throws: Exception if the request fails
-    /// - Returns: ByteBuffer
+    /// - Returns: Data
     ///
     open func getScreenshot(
         url: String,
@@ -347,7 +345,7 @@ open class Avatars: Service {
         height: Int? = nil,
         quality: Int? = nil,
         output: AppwriteEnums.Output? = nil
-    ) async throws -> ByteBuffer {
+    ) async throws -> Data {
         let apiPath: String = "/avatars/screenshots"
 
         let apiParams: [String: Any?] = [

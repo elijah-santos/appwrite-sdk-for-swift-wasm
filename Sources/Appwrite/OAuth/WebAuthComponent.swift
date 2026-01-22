@@ -1,6 +1,4 @@
-import AsyncHTTPClient
 import Foundation
-import NIO
 
 #if canImport(AuthenticationServices)
 import AuthenticationServices

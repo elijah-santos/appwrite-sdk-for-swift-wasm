@@ -1,5 +1,4 @@
 import Foundation
-import NIO
 
 open class InputFile {
 
@@ -27,15 +26,6 @@ open class InputFile {
         instance.mimeType = mimeType
         instance.sourceType = "data"
         instance.data = data
-        return instance
-    }
-
-    public static func fromBuffer(_ buffer: ByteBuffer, filename: String, mimeType: String) -> InputFile {
-        let instance = InputFile()
-        instance.filename = filename
-        instance.mimeType = mimeType
-        instance.sourceType = "buffer"
-        instance.data = buffer
         return instance
     }
 }

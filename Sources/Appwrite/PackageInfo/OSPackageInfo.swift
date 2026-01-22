@@ -9,6 +9,14 @@ class OSPackageInfo {
         return PackageInfo.getLinuxPackage()
         #elseif os(Windows)
         return PackageInfo.getWindowsPackage()
+        #elseif os(WASI)
+        // TODO: have a better response in this case
+        return PackageInfo(
+            appName: "unknown", 
+            version: "unknown", 
+            buildNumber: "unknown", 
+            packageName: "unknown"
+        )
         #endif
     }
 }

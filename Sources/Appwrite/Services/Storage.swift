@@ -1,6 +1,4 @@
-import AsyncHTTPClient
 import Foundation
-import NIO
 import JSONCodable
 import AppwriteEnums
 import AppwriteModels
@@ -235,13 +233,13 @@ open class Storage: Service {
     ///   - fileId: String
     ///   - token: String (optional)
     /// - Throws: Exception if the request fails
-    /// - Returns: ByteBuffer
+    /// - Returns: Data
     ///
     open func getFileDownload(
         bucketId: String,
         fileId: String,
         token: String? = nil
-    ) async throws -> ByteBuffer {
+    ) async throws -> Data {
         let apiPath: String = "/storage/buckets/{bucketId}/files/{fileId}/download"
             .replacingOccurrences(of: "{bucketId}", with: bucketId)
             .replacingOccurrences(of: "{fileId}", with: fileId)
@@ -281,7 +279,7 @@ open class Storage: Service {
     ///   - output: AppwriteEnums.ImageFormat (optional)
     ///   - token: String (optional)
     /// - Throws: Exception if the request fails
-    /// - Returns: ByteBuffer
+    /// - Returns: Data
     ///
     open func getFilePreview(
         bucketId: String,
@@ -298,7 +296,7 @@ open class Storage: Service {
         background: String? = nil,
         output: AppwriteEnums.ImageFormat? = nil,
         token: String? = nil
-    ) async throws -> ByteBuffer {
+    ) async throws -> Data {
         let apiPath: String = "/storage/buckets/{bucketId}/files/{fileId}/preview"
             .replacingOccurrences(of: "{bucketId}", with: bucketId)
             .replacingOccurrences(of: "{fileId}", with: fileId)
@@ -336,13 +334,13 @@ open class Storage: Service {
     ///   - fileId: String
     ///   - token: String (optional)
     /// - Throws: Exception if the request fails
-    /// - Returns: ByteBuffer
+    /// - Returns: Data
     ///
     open func getFileView(
         bucketId: String,
         fileId: String,
         token: String? = nil
-    ) async throws -> ByteBuffer {
+    ) async throws -> Data {
         let apiPath: String = "/storage/buckets/{bucketId}/files/{fileId}/view"
             .replacingOccurrences(of: "{bucketId}", with: bucketId)
             .replacingOccurrences(of: "{fileId}", with: fileId)

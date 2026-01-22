@@ -1,6 +1,4 @@
-import AsyncHTTPClient
 import Foundation
-import NIO
 import JSONCodable
 import AppwriteEnums
 import AppwriteModels
@@ -1630,12 +1628,9 @@ open class Account: Service {
         let url = URL(string: client.endPoint + apiPath + query)!
         let callbackScheme = "appwrite-callback-\(client.config["project"] ?? "")"
 
-        _ = try await withCheckedThrowingContinuation { continuation in
-            /// main thread for PresentationContextProvider
-            DispatchQueue.main.async {
-                WebAuthComponent.authenticate(url: url, callbackScheme: callbackScheme) { result in
-                    continuation.resume(with: result)
-                }
+        await MainActor.run {
+            WebAuthComponent.authenticate(url: url, callbackScheme: callbackScheme) { result in
+                
             }
         }
 
@@ -2135,12 +2130,9 @@ open class Account: Service {
         let url = URL(string: client.endPoint + apiPath + query)!
         let callbackScheme = "appwrite-callback-\(client.config["project"] ?? "")"
 
-        _ = try await withCheckedThrowingContinuation { continuation in
-            /// main thread for PresentationContextProvider
-            DispatchQueue.main.async {
-                WebAuthComponent.authenticate(url: url, callbackScheme: callbackScheme) { result in
-                    continuation.resume(with: result)
-                }
+        await MainActor.run {
+            WebAuthComponent.authenticate(url: url, callbackScheme: callbackScheme) { result in
+        
             }
         }
 

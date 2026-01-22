@@ -1,14 +1,9 @@
-import NIO
-import NIOCore
-import NIOFoundationCompat
-import NIOSSL
 import Foundation
-import AsyncHTTPClient
 @_exported import AppwriteModels
 @_exported import JSONCodable
 
-let DASHDASH = "--"
-let CRLF = "\r\n"
+let DASHDASH = "--".data(using: .ascii)!
+let CRLF = "\r\n".data(using: .ascii)!
 
 open class Client {
 
@@ -32,62 +27,17 @@ open class Client {
 
     internal var selfSigned: Bool = false
 
-    internal var http: HTTPClient
+    internal var http: any HTTPClient
 
 
     private static let boundaryChars = "abcdefghijklmnopqrstuvwxyz1234567890"
 
-    private static let boundary = randomBoundary()
-
-    private static var eventLoopGroupProvider = HTTPClient.EventLoopGroupProvider.singleton
+    private static let boundary = randomBoundary().data(using: .ascii)!
 
     // MARK: Methods
 
-    public init() {
-        http = Client.createHTTP()
-        addUserAgentHeader()
-        addOriginHeader()
-    }
-
-    private static func createHTTP(
-        selfSigned: Bool = false,
-        maxRedirects: Int = 5,
-        alloweRedirectCycles: Bool = false,
-        connectTimeout: TimeAmount = .seconds(30),
-        readTimeout: TimeAmount = .seconds(30)
-    ) -> HTTPClient {
-        let timeout = HTTPClient.Configuration.Timeout(
-            connect: connectTimeout,
-            read: readTimeout
-        )
-        let redirect = HTTPClient.Configuration.RedirectConfiguration.follow(
-            max: 5,
-            allowCycles: false
-        )
-        var tls = TLSConfiguration
-            .makeClientConfiguration()
-
-        if selfSigned {
-            tls.certificateVerification = .none
-        }
-
-        return HTTPClient(
-            eventLoopGroupProvider: eventLoopGroupProvider,
-            configuration: HTTPClient.Configuration(
-                tlsConfiguration: tls,
-                redirectConfiguration: redirect,
-                timeout: timeout,
-                decompression: .enabled(limit: .none)
-            )
-        )
-    }
-
-    deinit {
-        do {
-            try http.syncShutdown()
-        } catch {
-            print(error)
-        }
+    public init(http: some HTTPClient) {
+        self.http = http;
     }
 
     ///
@@ -160,21 +110,6 @@ open class Client {
     open func setDevKey(_ value: String) -> Client {
         config["devkey"] = value
         _ = addHeader(key: "X-Appwrite-Dev-Key", value: value)
-        return self
-    }
-
-
-    ///
-    /// Set self signed
-    ///
-    /// @param Bool status
-    ///
-    /// @return Client
-    ///
-    open func setSelfSigned(_ status: Bool = true) -> Client {
-        self.selfSigned = status
-        try! http.syncShutdown()
-        http = Client.createHTTP(selfSigned: status)
         return self
     }
 
@@ -304,7 +239,7 @@ open class Client {
         path: String = "",
         headers: [String: String] = [:],
         params: [String: Any?] = [:],
-        sink: ((ByteBuffer) -> Void)? = nil,
+        sink: ((Data) -> Void)? = nil,
         converter: ((Any) -> T)? = nil
     ) async throws -> T {
         let validParams = params.filter { $0.value != nil }
@@ -314,11 +249,11 @@ open class Client {
             : ""
 
         var request = HTTPClientRequest(url: endPoint + path + queryParameters)
-        request.method = .RAW(value: method)
+        request.method = method
 
 
         for (key, value) in self.headers.merging(headers, uniquingKeysWith: { $1 }) {
-            request.headers.add(name: key, value: value)
+            request.addHeader(key, value: value)
         }
 
         request.addDomainCookies()
@@ -336,8 +271,8 @@ open class Client {
         for request: inout HTTPClientRequest,
         with params: [String: Any?]
     ) throws {
-        if request.headers["content-type"][0] == "multipart/form-data" {
-            buildMultipart(&request, with: params, chunked: !request.headers["content-range"].isEmpty)
+        if request.headers(matching: "content-type")[0] == "multipart/form-data" {
+            buildMultipart(&request, with: params, chunked: !request.headers(matching: "content-range").isEmpty)
         } else {
             try buildJSON(&request, with: params)
         }
@@ -345,7 +280,7 @@ open class Client {
 
     private func execute<T>(
         _ request: HTTPClientRequest,
-        withSink bufferSink: ((ByteBuffer) -> Void)? = nil,
+        withSink bufferSink: ((Data) -> Void)? = nil,
         converter: ((Any) -> T)? = nil
     ) async throws -> T {
         let response = try await http.execute(
@@ -353,19 +288,19 @@ open class Client {
             timeout: .seconds(30)
         )
 
-        if let warning = response.headers["x-appwrite-warning"].first {
+        if let warning = response.headers(matching: "x-appwrite-warning").first {
             warning.split(separator: ";").forEach { warning in
                 fputs("Warning: \(warning)\n", stderr)
             }
         }
 
-        var data = try await response.body.collect(upTo: Int.max)
+        let data = response.body
 
-        switch response.status.code {
+        switch response.statusCode {
         case 0..<400:
-            if response.headers["Set-Cookie"].count > 0 {
+            if response.headers(matching: "Set-Cookie").count > 0 {
                 let domain = URL(string: request.url)!.host!
-                let new = response.headers["Set-Cookie"]
+                let new = response.headers(matching: "Set-Cookie")
 
                 UserDefaults.standard.set(new, forKey: domain)
             }
@@ -373,11 +308,11 @@ open class Client {
             case is Bool.Type:
                 return true as! T
             case is String.Type:
-                return (data.readString(length: data.readableBytes) ?? "") as! T
-            case is ByteBuffer.Type:
+                return (String(data: data, encoding: .utf8) ?? "") as! T
+            case is Data.Type:
                 return data as! T
             default:
-                if data.readableBytes == 0 {
+                if data.count == 0 {
                     return true as! T
                 }
                 let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any]
@@ -392,17 +327,17 @@ open class Client {
             do {
                 let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any]
 
-                message = dict?["message"] as? String ?? response.status.reasonPhrase
+                message = dict?["message"] as? String ?? response.statusCode.description
                 type = dict?["type"] as? String ?? ""
-                responseString = String(decoding: data.readableBytesView, as: UTF8.self)
+                responseString = String(data: data, encoding: .utf8) ?? ""
             } catch {
-                message =  data.readString(length: data.readableBytes)!
+                message =  String(data: data, encoding: .utf8)!
                 responseString = message
             }
 
             throw AppwriteError(
                 message: message,
-                code: Int(response.status.code),
+                code: response.statusCode,
                 type: type,
                 response: responseString
             )
@@ -422,14 +357,15 @@ open class Client {
 
         switch(input.sourceType) {
         case "path":
-            input.data = ByteBuffer(data: try! Data(contentsOf: URL(fileURLWithPath: input.path)))
+            input.data = try! Data(contentsOf: URL(fileURLWithPath: input.path))
         case "data":
-            input.data = ByteBuffer(data: input.data as! Data)
-        default:
+            // do nothing
             break
+        default:
+            fatalError("Unrecognized case for InputFile type \(input.sourceType)")
         }
 
-        let size = (input.data as! ByteBuffer).readableBytes
+        let size = (input.data as! Data).count
 
         if size < Client.chunkSize {
             params[paramName] = input
@@ -463,10 +399,9 @@ open class Client {
         }
 
         while offset < size {
-            let slice = (input.data as! ByteBuffer).getSlice(at: offset, length: Client.chunkSize)
-                ?? (input.data as! ByteBuffer).getSlice(at: offset, length: Int(size - offset))
+            let slice = (input.data as! Data)[offset..<min(offset + Client.chunkSize, size - offset)]
 
-            params[paramName] = InputFile.fromBuffer(slice!, filename: input.filename, mimeType: input.mimeType)
+            params[paramName] = InputFile.fromData(slice, filename: input.filename, mimeType: input.mimeType)
             headers["content-range"] = "bytes \(offset)-\(min((offset + Client.chunkSize) - 1, size - 1))/\(size)"
 
             result = try await call(
@@ -531,7 +466,7 @@ open class Client {
 
         let json = try JSONSerialization.data(withJSONObject: encodedParams, options: [])
 
-        request.body = .bytes(json)
+        request.body = json
     }
 
     private func buildMultipart(
@@ -540,33 +475,33 @@ open class Client {
         chunked: Bool = false
     ) {
         func addPart(name: String, value: Any) {
-            bodyBuffer.writeString(DASHDASH)
-            bodyBuffer.writeString(Client.boundary)
-            bodyBuffer.writeString(CRLF)
-            bodyBuffer.writeString("Content-Disposition: form-data; name=\"\(name)\"")
+            bodyBuffer += DASHDASH
+            bodyBuffer += Client.boundary
+            bodyBuffer += CRLF
+            bodyBuffer += "Content-Disposition: form-data; name=\"\(name)\"".data(using: .utf8)!
 
             if let file = value as? InputFile {
-                bodyBuffer.writeString("; filename=\"\(file.filename)\"")
-                bodyBuffer.writeString(CRLF)
-                bodyBuffer.writeString("Content-Length: \(bodyBuffer.readableBytes)")
-                bodyBuffer.writeString(CRLF+CRLF)
+                bodyBuffer += "; filename=\"\(file.filename)\"".data(using: .utf8)!
+                bodyBuffer += CRLF
+                bodyBuffer += "Content-Length: \(bodyBuffer.count)".data(using: .utf8)!
+                bodyBuffer += CRLF + CRLF
 
-                var buffer = file.data! as! ByteBuffer
+                let buffer = file.data! as! Data
 
-                bodyBuffer.writeBuffer(&buffer)
-                bodyBuffer.writeString(CRLF)
+                bodyBuffer += buffer
+                bodyBuffer += CRLF
                 return
             }
 
             let string = String(describing: value)
-            bodyBuffer.writeString(CRLF)
-            bodyBuffer.writeString("Content-Length: \(string.count)")
-            bodyBuffer.writeString(CRLF+CRLF)
-            bodyBuffer.writeString(string)
-            bodyBuffer.writeString(CRLF)
+            bodyBuffer += CRLF
+            bodyBuffer += "Content-Length: \(string.count)".data(using: .utf8)!
+            bodyBuffer += CRLF + CRLF
+            bodyBuffer += string.data(using: .utf8)!
+            bodyBuffer += CRLF
         }
 
-        var bodyBuffer = ByteBuffer()
+        var bodyBuffer = Data()
 
         for (key, value) in params {
             switch key {
@@ -583,84 +518,16 @@ open class Client {
             }
         }
 
-        bodyBuffer.writeString(DASHDASH)
-        bodyBuffer.writeString(Client.boundary)
-        bodyBuffer.writeString(DASHDASH)
-        bodyBuffer.writeString(CRLF)
+        bodyBuffer += DASHDASH
+        bodyBuffer += Client.boundary
+        bodyBuffer += DASHDASH
+        bodyBuffer += CRLF
 
-        request.headers.remove(name: "content-type")
+        request.removeHeader("content-type")
         if !chunked {
-            request.headers.add(name: "Content-Length", value: bodyBuffer.readableBytes.description)
+            request.addHeader("Content-Length", value: bodyBuffer.count.description)
         }
-        request.headers.add(name: "Content-Type", value: "multipart/form-data;boundary=\"\(Client.boundary)\"")
-        request.body = .bytes(bodyBuffer)
-    }
-
-    private func addUserAgentHeader() {
-        let packageInfo = OSPackageInfo.get()
-        let device = Client.getDevice()
-
-        #if !os(Linux) && !os(Windows)
-        _ = addHeader(
-            key: "user-agent",
-            value: "\(packageInfo.packageName)/\(packageInfo.version) \(device)"
-        )
-        #endif
-    }
-
-    private func addOriginHeader() {
-        let packageInfo = OSPackageInfo.get()
-        let operatingSystem = Client.getOperatingSystem()
-        _ = addHeader(
-            key: "origin",
-            value: "appwrite-\(operatingSystem)://\(packageInfo.packageName)"
-        )
-    }
-}
-
-extension Client {
-    private static func getOperatingSystem() -> String {
-        #if os(iOS)
-        return "ios"
-        #elseif os(watchOS)
-        return "watchos"
-        #elseif os(tvOS)
-        return "tvos"
-        #elseif os(macOS)
-        return "macos"
-        #elseif os(visionOS)
-        return "visionos"
-        #elseif os(Linux)
-        return "linux"
-        #elseif os(Windows)
-        return "windows"
-        #endif
-    }
-
-    private static func getDevice() -> String {
-        let deviceInfo = OSDeviceInfo()
-        var device = ""
-
-        #if os(iOS)
-        let info = deviceInfo.iOSInfo
-        device = "\(info!.modelIdentifier) iOS/\(info!.systemVersion)"
-        #elseif os(watchOS)
-        let info = deviceInfo.watchOSInfo
-        device = "\(info!.modelIdentifier) watchOS/\(info!.systemVersion)"
-        #elseif os(tvOS)
-        let info = deviceInfo.iOSInfo
-        device = "\(info!.modelIdentifier) tvOS/\(info!.systemVersion)"
-        #elseif os(macOS)
-        let info = deviceInfo.macOSInfo
-        device = "(Macintosh; \(info!.model))"
-        #elseif os(Linux)
-        let info = deviceInfo.linuxInfo
-        device = "(Linux; U; \(info!.id) \(info!.version))"
-        #elseif os(Windows)
-        let info = deviceInfo.windowsInfo
-        device = "(Windows NT; \(info!.computerName))"
-        #endif
-
-        return device
+        request.addHeader("Content-Type", value: "multipart/form-data;boundary=\"\(Client.boundary)\"")
+        request.body = bodyBuffer
     }
 }
